@@ -1,0 +1,156 @@
+.data
+
+.text
+
+main :
+     
+     #lw $t0,0 ($a1) #y_0 address
+     #lw $t1,4 ($a1) #h address
+     #lw $t2,8 ($a1) #no of steps address
+     
+     #lb $a0, 0 ($t0)   #get y_0
+     #add $t7,$a0,$zero #used for testing purposes
+     #addi $a0,$a0,-48  #convert from unicode to get y_0 value
+     #lb $a1, 0 ($t1)   #get h
+     #addi $a1,$a1,-48
+     
+     #lb $a2, 0 ($t2)   #get no of steps
+     #addi $a2,$a2,-48
+     #test with inputs
+     addi $a0,$zero,3
+      addi $a1,$zero,1
+      addi $a2,$zero,2
+      
+     jal euler_fn 
+     #printing output $v0 for testing purposes
+     #add $t0,$v0,$zero
+     #addi $v0,$v0,1
+     #add $a0,$t0,$zero
+     #syscall
+     j end #exit from main 
+
+euler_fn :
+     addi $sp,$sp , -16
+     add $t0,$zero ,$a2    #i=steps
+     add $t1, $zero,$a0    # y_cur 
+     add $t2 , $zero,$zero #t=0
+       
+     sw $a1, 12 ($sp) #store h in stack
+     sw $t0, 8 ($sp) #store i
+     sw $t1, 4 ($sp) #store y-cur
+     sw $ra, 0 ($sp)
+          
+for: beq $t0,$zero,break
+     add $a0, $t2, $zero #first arg of y_derv =t
+     add $a1, $t1, $zero #2nd arg of y_derv = y_cur
+     jal y_derv #return y'(t,y_cur)
+     lw $a0, 12 ($sp) #a0=h
+     add $a1, $v0,$zero #a1=y'(t,y_cur) 
+     jal multi #return h*y'(t,y_cur)
+     
+     lw $a1, 12 ($sp) #a1=h
+     lw $t0, 8 ($sp) #t0=i
+     lw $t1, 4 ($sp)  #t1=y_cur
+     add $t1,$t1,$v0  #y_cur=y_cur+h*y_derv(t, y_cur)
+     add $t2,$t2,$a1  #t+=h
+     addi $t0,$t0,-1  #i--
+     sw $t0, 8 ($sp) #store i in stack after decrementing
+     sw $t1, 4 ($sp)  #store y_cur in stack
+     j for #return to for
+#exiting function:
+break: add $v0, $t1,$zero #v0=y_cur 
+       lui $t0,4097
+       sw $v0, 0 ($t0) #store $v0 in memory address 0x10010000
+       lw $ra, 0 ($sp)
+       addi $sp, $sp , 16
+       jr $ra
+
+y_derv:
+       addi $sp , $sp , -20
+       sw $ra, 0 ($sp)
+       sw $a1, 4 ($sp) #y
+       sw $a0, 8 ($sp) #x
+       addi $t0, $zero, -2 
+       sw $t0, 12 ($sp) #result to be returned
+       addi $a1, $zero, 39 
+       #a0=x
+       jal multi #get 39*x
+       
+       lw $t0, 12 ($sp)
+       add $t0, $t0, $v0 #39*x-2
+       sw $t0, 12 ($sp)
+       lw $a0, 8 ($sp) #a0=x
+       add $a1, $a0, $zero #a1=x
+       jal multi #get x^2
+       
+       sw $v0 ,16 ($sp) #store x^2 to be used to get x^3
+       addi $a0, $zero, 36
+       add $a1, $v0, $zero #a1=x^2
+       jal multi #get 36*x^2
+       
+       lw $t0, 12 ($sp)
+       sub $t0, $t0, $v0 #-36*x^2+39*x-2
+       sw $t0 ,12 ($sp)
+       lw $a0, 8 ($sp) #a0=x
+       lw $a1 ,16 ($sp)#a1=x^2       
+       jal multi #return x^3
+       
+       addi $a0, $zero, 224
+       add $a1, $v0,$zero #$a1=x^3
+       jal multi #return 224*x^3
+       
+       lw $t0, 12 ($sp)
+       add $t0,$t0 , $v0 #224*x^3-36*x^2+39*x-2
+       sw $t0, 12 ($sp)
+       lw $a1, 4 ($sp) #a1=y
+       addi $a0, $zero, 68
+       jal multi #get 68*y
+       
+       lw $t0, 12 ($sp)
+       sub $t0, $t0, $v0 #224*x^3-36*x^2+39*x-2-68*y
+       sw $t0, 12 ($sp)   
+       lw $a1, 4 ($sp) #a1=y
+       add $a0, $a1 , $zero #a0=y
+       jal multi #get y^2
+       
+       sw $v0, 16 ($sp) #store y^2 to be able to get y^3
+       addi $a0, $zero , 2
+       add $a1, $v0 , $zero #a1=y^2
+       jal multi #return 2*y^2
+       
+       lw $t0, 12 ($sp)
+       sub $t0 , $t0 , $v0 #224*x^3-36*x^2+39*x-2-68*y-2*y^2
+       sw $t0, 12 ($sp)
+       lw $a0 , 4 ($sp) #y in $a0
+       lw $a1, 16 ($sp) #$a1 = y^2
+       jal multi #return y^3
+       
+       addi $a0, $zero , 226
+       add $a1 , $v0 , $zero #$a1 =y^3
+       jal multi  #return 226 *y^3
+       
+       lw $t0, 12 ($sp)
+       add $v0 , $t0 , $v0 #224*x^3-36*x^2+39*x-2-68*y-2*y^2+226*y^3
+#exiting function:
+       lw $ra,0 ($sp)
+       addi $sp , $sp , 20
+       jr $ra
+
+multi :
+#finds a0 x a1 by shifting a1 then repeatedly add results after shift to v0
+#shift of a1 is done based on binary expansion of a0 
+          slt $t1,$a0,$zero #checks for negative
+          add $v0, $zero, $zero #inilaise output to 0
+          beq $t1,$zero,loop #if a0>0 goto loop else set a0=-a0 and goto loop
+          sub $a0,$zero,$a0  
+loop :    beq $a0,$zero, exit #exit loop if a0=0
+          andi $t0,$a0,1 
+          beq $t0, $zero ,continue
+          add $v0,$v0, $a1     
+continue: sll $a1,$a1,1 
+          srl $a0,$a0,1
+          j loop
+exit:     beq $t1,$zero ,return #multiply result by -1 is a0<0
+          sub $v0,$zero,$v0 
+return:   jr $ra
+end:
